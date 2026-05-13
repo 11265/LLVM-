@@ -11,6 +11,7 @@
 #ifndef LLVM_ASM_WRAPPER_H
 #define LLVM_ASM_WRAPPER_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
