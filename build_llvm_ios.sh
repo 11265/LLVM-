@@ -93,8 +93,9 @@ cmake -S "${LLVM_DIR}/llvm" \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
       -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
       \
-      `# 使用阶段1的原生 TableGen (不触发 NATIVE 子构建)` \
+      `# 使用阶段1的原生 TableGen，并禁用 NATIVE 子构建` \
       -DLLVM_TABLEGEN="${TABLEGEN_BIN}" \
+      -DLLVM_USE_HOST_TOOLS=OFF \
       \
       `# 仅构建 AArch64 目标` \
       -DLLVM_TARGETS_TO_BUILD=AArch64 \
