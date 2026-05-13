@@ -79,9 +79,7 @@ else
           -DLLVM_ENABLE_PROJECTS="" \
           -DLLVM_ENABLE_TERMINFO=OFF \
           -DLLVM_ENABLE_ZLIB=OFF \
-          -DLLVM_ENABLE_ZSTD=OFF \
-          -DLLVM_ENABLE_THREADS=OFF \
-          -DLLVM_ENABLE_UNWIND_TABLES=OFF
+          -DLLVM_ENABLE_ZSTD=OFF
     cmake --build "${NATIVE_BUILD}" \
           --target llvm-tblgen \
           -j"${CPU_COUNT}"
