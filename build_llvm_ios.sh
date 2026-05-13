@@ -76,14 +76,28 @@ echo "[阶段2] 交叉编译 LLVM 库 (iOS arm64)..."
 
 # 移除不必要的子项目, 防止交叉编译时 CMake 配置报错
 # LLVM 的 BUILD_TOOLS/OFF 不阻止 add_subdirectory, 必须物理删除
+# 注意: utils/TableGen 是 CMake 构建依赖, 必须保留! 用 LLVM_INSTALL_UTILS=OFF 阻止安装
 rm -rf "${LLVM_DIR}/llvm/tools" \
-       "${LLVM_DIR}/llvm/utils" \
        "${LLVM_DIR}/llvm/third-party" \
        "${LLVM_DIR}/llvm/examples" \
        "${LLVM_DIR}/tools" \
-       "${LLVM_DIR}/utils" \
        "${LLVM_DIR}/third-party" \
        "${LLVM_DIR}/examples" 2>/dev/null || true
+# 删除 utils 下除了 TableGen 外的一切
+for d in "${LLVM_DIR}/llvm/utils" "${LLVM_DIR}/utils"; do
+    if [ -d "$d" ]; then
+        find "$d" -mindepth 1 -maxdepth 1 ! -name 'TableGen' -exec rm -rf {} + 2>/dev/null || true
+    fi
+done
+
+# 验证 TableGen 目录未被误删 (CMake 构建依赖, 必须保留)
+TABLEGEN_CMAKE="${LLVM_DIR}/llvm/utils/TableGen/CMakeLists.txt"
+if [ ! -f "${TABLEGEN_CMAKE}" ]; then
+    echo "错误: utils/TableGen 目录缺失! CMake 需要此目录进行头文件生成."
+    echo "请检查 LLVM 源码是否完整, 或 find 命令是否误删了 TableGen."
+    exit 1
+fi
+echo "  已验证 utils/TableGen 目录完好"
 echo "[阶段2] 已移除工具/示例/第三方子项目"
 
 cmake -S "${LLVM_DIR}/llvm" \
@@ -142,6 +156,9 @@ cmake -S "${LLVM_DIR}/llvm" \
       -DLLVM_BUILD_TESTS=OFF \
       -DLLVM_BUILD_DOCS=OFF \
       -DLLVM_BUILD_BENCHMARKS=OFF \
+      \
+      `# 使用外部 TableGen, 不自行编译原生 TableGen` \
+      -DLLVM_OPTIMIZED_TABLEGEN=ON \
       \
       `# 交叉编译时跳过不可靠的 CMake 特征检测` \
       -DHAVE_CXX_ATOMICS_WITHOUT_LIB=1 \
