@@ -127,7 +127,14 @@ cmake -S "${LLVM_DIR}/llvm" \
       -DLLVM_BUILD_EXAMPLES=OFF \
       -DLLVM_BUILD_TESTS=OFF \
       -DLLVM_BUILD_DOCS=OFF \
-      -DLLVM_BUILD_BENCHMARKS=OFF
+      -DLLVM_BUILD_BENCHMARKS=OFF \
+      \
+      `# 交叉编译时跳过不可靠的 CMake 特征检测` \
+      -DHAVE_CXX_ATOMICS_WITHOUT_LIB=1 \
+      -DHAVE_CXX_ATOMICS64_WITHOUT_LIB=1 \
+      -DHAVE_POSIX_REGEX=0 \
+      -DHAVE_STEADY_CLOCK=0 \
+      -DBENCHMARK_ENABLE_TESTING=OFF
 
 echo "[阶段2] CMake 配置完成, 开始编译..."
 
