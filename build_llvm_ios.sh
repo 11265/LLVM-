@@ -8,19 +8,17 @@
 #       GitHub Actions (macos-14) 自动编译
 #       下载 artifact 后解压到主项目的 External/llvm/
 #
-# 策略: 两阶段构建
-#   阶段1: 编译原生 TableGen (macOS arm64)
-#   阶段2: 使用原生 TableGen 交叉编译 LLVM 库 (iOS arm64)
+# 策略: Homebrew 预编译 TableGen + iOS 交叉编译
+#   阶段1: brew install llvm (预编译, ~2分钟)
+#   阶段2: 使用 brew 的 TableGen 交叉编译 LLVM 库 (iOS arm64)
 # ============================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LLVM_VERSION="${1:-llvmorg-18.1.8}"
 LLVM_DIR="${SCRIPT_DIR}/llvm-src"
-NATIVE_BUILD="${SCRIPT_DIR}/llvm-build-native"
 IOS_BUILD="${SCRIPT_DIR}/llvm-build-ios"
 OUTPUT_DIR="${SCRIPT_DIR}/output"
-TABLEGEN_BIN="${NATIVE_BUILD}/bin/llvm-tblgen"
 
 # ---- 检查平台 ----
 if [[ "$(uname)" != "Darwin" ]]; then
@@ -29,7 +27,7 @@ if [[ "$(uname)" != "Darwin" ]]; then
     exit 1
 fi
 
-command -v cmake >/dev/null 2>&1 || { echo "错误: 需要 cmake (brew install cmake)"; exit 1; }
+command -v cmake >/dev/null 2>&1 || { echo "错误: 需要 cmake"; exit 1; }
 command -v xcrun  >/dev/null 2>&1 || { echo "错误: 需要 Xcode / Command Line Tools"; exit 1; }
 
 IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)
@@ -37,11 +35,8 @@ if [ -z "${IOS_SDK}" ] || [ ! -d "${IOS_SDK}" ]; then
     echo "错误: 找不到 iPhoneOS SDK"
     exit 1
 fi
-MACOS_SDK=$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)
-echo "macOS SDK: ${MACOS_SDK}"
 echo "iOS SDK: ${IOS_SDK}"
 echo "LLVM 版本: ${LLVM_VERSION}"
-
 CPU_COUNT=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
 echo "CPU 核心数: ${CPU_COUNT}"
 
@@ -57,38 +52,21 @@ else
 fi
 
 # ============================================================
-# 阶段 1: 构建原生 TableGen (macOS arm64)
+# 阶段 1: 获取预编译 TableGen (Homebrew)
 # ============================================================
-if [ -f "${TABLEGEN_BIN}" ]; then
-    echo "[阶段1] 原生 TableGen 已存在, 跳过"
-else
-    echo "[阶段1] 构建原生 TableGen..."
+BREW_LLVM_PREFIX="/opt/homebrew/opt/llvm@18"
+TABLEGEN_BIN="${BREW_LLVM_PREFIX}/bin/llvm-tblgen"
 
-    cmake -S "${LLVM_DIR}/llvm" \
-          -B "${NATIVE_BUILD}" \
-          -G "Ninja" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_OSX_SYSROOT="${MACOS_SDK}" \
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
-          -DCMAKE_CXX_STANDARD=17 \
-          -DLLVM_TARGETS_TO_BUILD="AArch64" \
-          -DLLVM_BUILD_LLVM_DYLIB=OFF \
-          -DLLVM_LINK_LLVM_DYLIB=OFF \
-          -DLLVM_INCLUDE_TESTS=OFF \
-          -DLLVM_INCLUDE_EXAMPLES=OFF \
-          -DLLVM_INCLUDE_DOCS=OFF \
-          -DLLVM_INCLUDE_BENCHMARKS=OFF \
-          -DLLVM_INCLUDE_RUNTIMES=OFF \
-          -DLLVM_BUILD_TOOLS=OFF \
-          -DLLVM_BUILD_UTILS=ON \
-          -DLLVM_ENABLE_PROJECTS="" \
-          -DLLVM_ENABLE_TERMINFO=OFF \
-          -DLLVM_ENABLE_ZLIB=OFF \
-          -DLLVM_ENABLE_ZSTD=OFF
-    cmake --build "${NATIVE_BUILD}" \
-          --target llvm-tblgen \
-          -j"${CPU_COUNT}"
-    echo "[阶段1] TableGen 构建完成: ${TABLEGEN_BIN}"
+if [ -x "${TABLEGEN_BIN}" ]; then
+    echo "[阶段1] TableGen 已安装: ${TABLEGEN_BIN}"
+else
+    echo "[阶段1] 安装 LLVM@18 (Homebrew)..."
+    brew install llvm@18 2>&1 | tail -5
+    if [ ! -x "${TABLEGEN_BIN}" ]; then
+        echo "错误: TableGen 安装失败"
+        exit 1
+    fi
+    echo "[阶段1] TableGen 就绪: ${TABLEGEN_BIN}"
 fi
 
 # ============================================================
