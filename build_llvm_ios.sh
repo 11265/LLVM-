@@ -75,14 +75,16 @@ fi
 echo "[阶段2] 交叉编译 LLVM 库 (iOS arm64)..."
 
 # 移除不必要的子项目, 防止交叉编译时 CMake 配置报错
-# 源码提取后 third-party/ 可能在 llvm/ 子目录或 llvm-src/ 根, 都要删除
-rm -rf "${LLVM_DIR}/llvm/tools/verify-uselistorder" \
-       "${LLVM_DIR}/llvm/third-party/benchmark" \
+# LLVM 的 BUILD_TOOLS/OFF 不阻止 add_subdirectory, 必须物理删除
+rm -rf "${LLVM_DIR}/llvm/tools" \
+       "${LLVM_DIR}/llvm/utils" \
+       "${LLVM_DIR}/llvm/third-party" \
        "${LLVM_DIR}/llvm/examples" \
-       "${LLVM_DIR}/third-party/benchmark" \
-       "${LLVM_DIR}/tools/verify-uselistorder" \
+       "${LLVM_DIR}/tools" \
+       "${LLVM_DIR}/utils" \
+       "${LLVM_DIR}/third-party" \
        "${LLVM_DIR}/examples" 2>/dev/null || true
-echo "[阶段2] 已移除无关子项目"
+echo "[阶段2] 已移除工具/示例/第三方子项目"
 
 cmake -S "${LLVM_DIR}/llvm" \
       -B "${IOS_BUILD}" \
@@ -126,6 +128,8 @@ cmake -S "${LLVM_DIR}/llvm" \
       \
       `# 不需要的项目/工具` \
       -DLLVM_ENABLE_PROJECTS="" \
+      `# 禁止子项目 add_subdirectory (cmake 层面)` \
+      -DLLVM_INCLUDE_TOOLS=OFF \
       -DLLVM_INCLUDE_UTILS=OFF \
       -DLLVM_INCLUDE_TESTS=OFF \
       -DLLVM_INCLUDE_EXAMPLES=OFF \
