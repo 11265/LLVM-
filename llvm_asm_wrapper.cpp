@@ -240,6 +240,9 @@ void *LLVMDisasmCreate(const char *triple) {
     ctx->IP.reset(TheTarget->createMCInstPrinter(TT, 0, *ctx->MAI, *ctx->MII, *ctx->MRI));
     if (!ctx->IP) return nullptr;
 
+    // 匹配旧 C API LLVMSetDisasmOptions PrintImmHex 行为
+    ctx->IP->setPrintImmHex(true);
+
     return ctx.release();
 }
 
