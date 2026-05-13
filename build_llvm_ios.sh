@@ -92,6 +92,7 @@ cmake -S "${LLVM_DIR}/llvm" \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
       -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+      -DCMAKE_MACOSX_BUNDLE=OFF \
       \
       `# 使用阶段1的原生 TableGen，并禁用 NATIVE 子构建` \
       -DLLVM_TABLEGEN="${TABLEGEN_BIN}" \
