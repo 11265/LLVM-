@@ -75,9 +75,13 @@ fi
 echo "[阶段2] 交叉编译 LLVM 库 (iOS arm64)..."
 
 # 移除不必要的子项目, 防止交叉编译时 CMake 配置报错
+# 源码提取后 third-party/ 可能在 llvm/ 子目录或 llvm-src/ 根, 都要删除
 rm -rf "${LLVM_DIR}/llvm/tools/verify-uselistorder" \
        "${LLVM_DIR}/llvm/third-party/benchmark" \
-       "${LLVM_DIR}/llvm/examples"
+       "${LLVM_DIR}/llvm/examples" \
+       "${LLVM_DIR}/third-party/benchmark" \
+       "${LLVM_DIR}/tools/verify-uselistorder" \
+       "${LLVM_DIR}/examples" 2>/dev/null || true
 echo "[阶段2] 已移除无关子项目"
 
 cmake -S "${LLVM_DIR}/llvm" \
@@ -140,6 +144,7 @@ cmake -S "${LLVM_DIR}/llvm" \
       -DHAVE_CXX_ATOMICS64_WITHOUT_LIB=1 \
       -DHAVE_POSIX_REGEX=0 \
       -DHAVE_STEADY_CLOCK=0 \
+      -DHAVE_THREAD_SAFETY_ATTRIBUTES=0 \
       -DBENCHMARK_ENABLE_TESTING=OFF
 
 echo "[阶段2] CMake 配置完成, 开始编译..."
