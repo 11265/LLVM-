@@ -30,6 +30,29 @@ uint32_t LLVMAssemble(const char *instruction, uint64_t address);
 /// 释放汇编器资源（进程退出时调用，也可不调）
 void LLVMAssembleCleanup(void);
 
+// ============================================================
+// 反汇编 API
+// ============================================================
+
+/// 创建反汇编器上下文
+/// @param triple  目标三元组（如 "arm64-apple-ios15.0"），传 NULL 使用默认
+/// @return 不透明句柄，失败返回 NULL
+void *LLVMDisasmCreate(const char *triple);
+
+/// 反汇编单条指令
+/// @param dc       反汇编器句柄
+/// @param bytes    指令字节数组
+/// @param size     字节数（ARM64 固定 4）
+/// @param address  指令地址（影响 PC-relative 显示）
+/// @param out      输出字符串缓冲区
+/// @param outSize  缓冲区大小
+/// @return 写入的字符数（不含末尾 \0），0 表示失败
+size_t LLVMDisasmInst(void *dc, const uint8_t *bytes, size_t size,
+                      uint64_t address, char *out, size_t outSize);
+
+/// 销毁反汇编器上下文
+void LLVMDisasmDestroy(void *dc);
+
 #ifdef __cplusplus
 }
 #endif

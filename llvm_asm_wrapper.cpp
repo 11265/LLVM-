@@ -11,7 +11,10 @@
 #include <llvm/MC/MCAsmInfo.h>
 #include <llvm/MC/MCCodeEmitter.h>
 #include <llvm/MC/MCContext.h>
+#include <llvm/MC/MCDisassembler/MCDisassembler.h>
 #include <llvm/MC/MCInst.h>
+#include <llvm/MC/MCInstPrinter.h>
+#include <llvm/MC/MCInstrAnalysis.h>
 #include <llvm/MC/MCInstrInfo.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCParser/MCAsmLexer.h>
@@ -24,8 +27,10 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/TargetParser/Triple.h>
 
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -170,6 +175,103 @@ uint32_t LLVMAssemble(const char *instruction, uint64_t address) {
     }
 
     return 0;
+}
+
+// ============================================================
+// 反汇编器上下文
+// 直接用 LLVM C++ API 创建，绕过 LLVMCreateDisasm(C API) 的初始化问题
+// ============================================================
+
+struct DisasmContext {
+    Triple TT;
+    const Target *TheTarget;
+    std::unique_ptr<MCRegisterInfo> MRI;
+    std::unique_ptr<MCAsmInfo> MAI;
+    std::unique_ptr<MCSubtargetInfo> STI;
+    std::unique_ptr<MCInstrInfo> MII;
+    std::unique_ptr<MCDisassembler> DisAsm;
+    std::unique_ptr<MCInstPrinter> IP;
+    std::unique_ptr<MCContext> Ctx;
+};
+
+static bool gDisasmTargetsRegistered = false;
+static std::mutex gDisasmMutex;
+
+static void ensureDisasmTargets(void) {
+    if (gDisasmTargetsRegistered) return;
+    std::lock_guard<std::mutex> lock(gDisasmMutex);
+    if (gDisasmTargetsRegistered) return;
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64TargetMC();
+    LLVMInitializeAArch64Disassembler();
+    gDisasmTargetsRegistered = true;
+}
+
+void *LLVMDisasmCreate(const char *triple) {
+    ensureDisasmTargets();
+
+    Triple TT(triple && triple[0] ? triple : "arm64-apple-ios15.0");
+
+    std::string Error;
+    auto *TheTarget = TargetRegistry::lookupTarget(TT.str(), Error);
+    if (!TheTarget) return nullptr;
+
+    auto ctx = std::make_unique<DisasmContext>();
+    ctx->TT = TT;
+    ctx->TheTarget = TheTarget;
+
+    ctx->MRI.reset(TheTarget->createMCRegInfo(TT.str()));
+    ctx->MII.reset(TheTarget->createMCInstrInfo());
+    ctx->STI.reset(TheTarget->createMCSubtargetInfo(TT.str(), "", ""));
+
+    if (!ctx->MRI || !ctx->MII || !ctx->STI) return nullptr;
+
+    MCTargetOptions MCOpts;
+    ctx->MAI.reset(TheTarget->createMCAsmInfo(*ctx->MRI, TT.str(), MCOpts));
+    if (!ctx->MAI) return nullptr;
+
+    // MCContext 必须比 MCDisassembler 活得久
+    ctx->Ctx = std::make_unique<MCContext>(TT, ctx->MAI.get(),
+                                            ctx->MRI.get(), ctx->STI.get());
+
+    ctx->DisAsm.reset(TheTarget->createMCDisassembler(*ctx->STI, *ctx->Ctx));
+    if (!ctx->DisAsm) return nullptr;
+
+    ctx->IP.reset(TheTarget->createMCInstPrinter(TT, 0, *ctx->MAI, *ctx->MII, *ctx->MRI));
+    if (!ctx->IP) return nullptr;
+
+    return ctx.release();
+}
+
+size_t LLVMDisasmInst(void *dc, const uint8_t *bytes, size_t size,
+                      uint64_t address, char *out, size_t outSize) {
+    if (!dc || !bytes || !out || !outSize) return 0;
+
+    auto *ctx = static_cast<DisasmContext *>(dc);
+
+    MCInst Inst;
+    uint64_t InstSize = 0;
+    MCDisassembler::DecodeStatus S =
+        ctx->DisAsm->getInstruction(Inst, InstSize,
+                                     ArrayRef<uint8_t>(bytes, size),
+                                     address, nulls());
+
+    if (S != MCDisassembler::Success) return 0;
+
+    // 用 MCInstPrinter 格式化成字符串
+    std::string formatted;
+    raw_string_ostream OS(formatted);
+    ctx->IP->printInst(&Inst, address, "", *ctx->STI, OS);
+
+    size_t copyLen = std::min(formatted.size(), outSize - 1);
+    std::memcpy(out, formatted.data(), copyLen);
+    out[copyLen] = '\0';
+
+    return copyLen;
+}
+
+void LLVMDisasmDestroy(void *dc) {
+    delete static_cast<DisasmContext *>(dc);
 }
 
 // ============================================================
