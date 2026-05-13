@@ -74,6 +74,12 @@ fi
 # ============================================================
 echo "[阶段2] 交叉编译 LLVM 库 (iOS arm64)..."
 
+# 移除不必要的子项目, 防止交叉编译时 CMake 配置报错
+rm -rf "${LLVM_DIR}/llvm/tools/verify-uselistorder" \
+       "${LLVM_DIR}/llvm/third-party/benchmark" \
+       "${LLVM_DIR}/llvm/examples"
+echo "[阶段2] 已移除无关子项目"
+
 cmake -S "${LLVM_DIR}/llvm" \
       -B "${IOS_BUILD}" \
       -G "Ninja" \
