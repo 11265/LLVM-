@@ -1,0 +1,52 @@
+name: Build LLVM Disassembler for iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      llvm_version:
+        description: 'LLVM version tag (e.g. llvmorg-18.1.8)'
+        required: false
+        default: 'llvmorg-18.1.8'
+  push:
+    paths:
+      - 'build_llvm_ios.sh'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache LLVM source
+        id: cache-llvm-src
+        uses: actions/cache@v4
+        with:
+          path: llvm-src
+          key: llvm-src-${{ inputs.llvm_version || 'llvmorg-18.1.8' }}
+
+      - name: Build LLVM for iOS
+        run: |
+          chmod +x build_llvm_ios.sh
+          bash build_llvm_ios.sh "${{ inputs.llvm_version || 'llvmorg-18.1.8' }}"
+
+      - name: Show result
+        run: |
+          echo "=== Static library ==="
+          ls -lh output/libLLVMDisasm.a
+          echo ""
+          echo "=== C API headers ==="
+          ls output/include/llvm-c/
+          echo ""
+          echo "=== Arch check (should be arm64) ==="
+          file output/libLLVMDisasm.a
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-ios-arm64-disasm
+          path: |
+            output/libLLVMDisasm.a
+            output/include/
+          retention-days: 90
