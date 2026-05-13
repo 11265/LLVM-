@@ -158,8 +158,7 @@ cmake --build "${IOS_BUILD}" \
       LLVMAArch64Info \
       LLVMAArch64Utils \
       LLVMAArch64AsmParser \
-      LLVMAArch64AsmBackend \
-      LLVMAArch64MCCodeEmitter \
+      LLVMMCParser \
       -j"${CPU_COUNT}"
 
 echo "[阶段2] LLVM 库编译完成"
@@ -223,10 +222,9 @@ LLVM_LIBS=(
     "libLLVMAArch64Info.a"
     "libLLVMAArch64Utils.a"
     "libLLVMAArch64AsmParser.a"
-    "libLLVMAArch64AsmBackend.a"
-    "libLLVMAArch64MCCodeEmitter.a"
     "libLLVMMCDisassembler.a"
     "libLLVMMC.a"
+    "libLLVMMCParser.a"
     "libLLVMSupport.a"
     "libLLVMDemangle.a"
     "libLLVMBinaryFormat.a"
