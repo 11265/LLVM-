@@ -106,7 +106,7 @@ cmake -S "${LLVM_DIR}/llvm" \
       -DLLVM_BUILD_STATIC=ON \
       -DLLVM_BUILD_LLVM_DYLIB=OFF \
       -DLLVM_LINK_LLVM_DYLIB=OFF \
-      
+      \
       `# 最小化功能` \
       -DLLVM_ENABLE_TERMINFO=OFF \
       -DLLVM_ENABLE_ZLIB=OFF \
