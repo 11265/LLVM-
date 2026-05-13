@@ -1,4 +1,4 @@
-name: Build LLVM Disassembler for iOS
+name: Build LLVM Assembler+Disassembler for iOS
 
 on:
   workflow_dispatch:
@@ -10,6 +10,8 @@ on:
   push:
     paths:
       - 'build_llvm_ios.sh'
+      - 'llvm_asm_wrapper.h'
+      - 'llvm_asm_wrapper.cpp'
       - '.github/workflows/build.yml'
 
 jobs:
@@ -34,19 +36,22 @@ jobs:
       - name: Show result
         run: |
           echo "=== Static library ==="
-          ls -lh output/libLLVMDisasm.a
+          ls -lh output/libLLVMAssembler.a
           echo ""
           echo "=== C API headers ==="
           ls output/include/llvm-c/
           echo ""
+          echo "=== Wrapper header ==="
+          ls output/include/llvm_asm_wrapper.h
+          echo ""
           echo "=== Arch check (should be arm64) ==="
-          file output/libLLVMDisasm.a
+          file output/libLLVMAssembler.a
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: llvm-ios-arm64-disasm
+          name: llvm-ios-arm64-asm
           path: |
-            output/libLLVMDisasm.a
+            output/libLLVMAssembler.a
             output/include/
           retention-days: 90

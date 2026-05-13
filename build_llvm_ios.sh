@@ -1,16 +1,17 @@
 #!/bin/bash
 # ============================================================
-# LLVM iOS ARM64 反汇编静态库构建脚本
+# LLVM iOS ARM64 汇编+反汇编统一静态库构建脚本
 #
 # 独立仓库: iosgg-llvm-builder
-# 产物: output/libLLVMDisasm.a + output/include/llvm-c/
+# 产物: output/libLLVMAssembler.a + output/include/
 # 用法: 将此目录作为独立 git 仓库推送到 GitHub
 #       GitHub Actions (macos-14) 自动编译
-#       下载 artifact 后解压到主项目的 External/llvm/
+#       下载 artifact 后解压到主项目的 External/
 #
 # 策略: Homebrew 预编译 TableGen + iOS 交叉编译
-#   阶段1: brew install llvm (预编译, ~2分钟)
+#   阶段1: brew install llvm@18 (预编译, ~2分钟)
 #   阶段2: 使用 brew 的 TableGen 交叉编译 LLVM 库 (iOS arm64)
+#   阶段3: 编译 C 汇编包装器 → 合并为统一 libLLVMAssembler.a
 # ============================================================
 set -euo pipefail
 
@@ -156,20 +157,59 @@ cmake --build "${IOS_BUILD}" \
       LLVMAArch64Desc \
       LLVMAArch64Info \
       LLVMAArch64Utils \
+      LLVMAArch64AsmParser \
+      LLVMAArch64AsmBackend \
+      LLVMAArch64MCCodeEmitter \
       -j"${CPU_COUNT}"
 
-echo "[阶段2] 编译完成"
+echo "[阶段2] LLVM 库编译完成"
+
+# ============================================================
+# 阶段 3: 编译 C 汇编包装器
+# ============================================================
+echo "[阶段3] 编译 C 汇编包装器 (iOS arm64)..."
+
+WRAPPER_SRC="${SCRIPT_DIR}/llvm_asm_wrapper.cpp"
+WRAPPER_OBJ="${IOS_BUILD}/llvm_asm_wrapper.o"
+
+if [ -f "${WRAPPER_SRC}" ]; then
+    # 使用与主项目相同的 clang + iOS SDK 编译包装器
+    xcrun -sdk iphoneos clang++ \
+        -arch arm64 \
+        -std=c++17 \
+        -stdlib=libc++ \
+        -isysroot "${IOS_SDK}" \
+        -miphoneos-version-min=15.0 \
+        -fno-exceptions \
+        -fno-rtti \
+        -Os \
+        -I"${LLVM_DIR}/llvm/include" \
+        -I"${IOS_BUILD}/include" \
+        -I"${SCRIPT_DIR}" \
+        -c "${WRAPPER_SRC}" \
+        -o "${WRAPPER_OBJ}"
+    echo "  包装器编译成功: ${WRAPPER_OBJ}"
+else
+    echo "  跳过 (文件不存在): ${WRAPPER_SRC}"
+fi
 
 # ============================================================
 # 安装头文件
 # ============================================================
-echo "安装 C API 头文件..."
+echo "安装头文件..."
 mkdir -p "${OUTPUT_DIR}/include/llvm-c"
 
 HEADER_SRC="${LLVM_DIR}/llvm/include/llvm-c"
 if [ -d "${HEADER_SRC}" ]; then
     cp "${HEADER_SRC}/"*.h "${OUTPUT_DIR}/include/llvm-c/"
-    echo "  已复制 $(ls "${OUTPUT_DIR}/include/llvm-c/"*.h 2>/dev/null | wc -l) 个头文件"
+    echo "  已复制 $(ls "${OUTPUT_DIR}/include/llvm-c/"*.h 2>/dev/null | wc -l) 个 C API 头文件"
+fi
+
+# 复制汇编包装器头文件
+WRAPPER_HEADER="${SCRIPT_DIR}/llvm_asm_wrapper.h"
+if [ -f "${WRAPPER_HEADER}" ]; then
+    cp "${WRAPPER_HEADER}" "${OUTPUT_DIR}/include/"
+    echo "  已复制汇编包装器头文件"
 fi
 
 # ============================================================
@@ -182,6 +222,9 @@ LLVM_LIBS=(
     "libLLVMAArch64Desc.a"
     "libLLVMAArch64Info.a"
     "libLLVMAArch64Utils.a"
+    "libLLVMAArch64AsmParser.a"
+    "libLLVMAArch64AsmBackend.a"
+    "libLLVMAArch64MCCodeEmitter.a"
     "libLLVMMCDisassembler.a"
     "libLLVMMC.a"
     "libLLVMSupport.a"
@@ -192,7 +235,7 @@ LLVM_LIBS=(
     "libLLVMDebugInfoDWARF.a"
 )
 
-OUTPUT_LIB="${OUTPUT_DIR}/libLLVMDisasm.a"
+OUTPUT_LIB="${OUTPUT_DIR}/libLLVMAssembler.a"
 TMP_OBJ="${IOS_BUILD}/tmp_obj"
 rm -rf "${TMP_OBJ}"
 mkdir -p "${TMP_OBJ}"
@@ -209,6 +252,12 @@ for lib in "${LLVM_LIBS[@]}"; do
         ((MISSING++)) || true
     fi
 done
+
+# 额外加入编译好的包装器 .o
+if [ -f "${WRAPPER_OBJ}" ]; then
+    cp "${WRAPPER_OBJ}" "${TMP_OBJ}/"
+    echo "  已加入包装器 .o"
+fi
 
 OBJ_COUNT=$(find "${TMP_OBJ}" -name "*.o" 2>/dev/null | wc -l)
 echo "  找到 ${FOUND} 个库, 缺失 ${MISSING} 个"
@@ -235,8 +284,8 @@ echo "============================================"
 echo "  构建成功!"
 echo "============================================"
 echo "  静态库: ${OUTPUT_LIB} ($(du -h "${OUTPUT_LIB}" | cut -f1))"
-echo "  头文件: ${OUTPUT_DIR}/include/llvm-c/"
+echo "  头文件: ${OUTPUT_DIR}/include/"
 echo "============================================"
 echo ""
 echo "下载本仓库的 GitHub Actions artifact 后:"
-echo "  unzip llvm-ios-arm64-disasm.zip -d /path/to/iosgg/External/llvm/"
+echo "  unzip llvm-ios-arm64-asm.zip -d /path/to/iosgg/External/"
