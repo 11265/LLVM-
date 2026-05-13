@@ -37,6 +37,8 @@ if [ -z "${IOS_SDK}" ] || [ ! -d "${IOS_SDK}" ]; then
     echo "错误: 找不到 iPhoneOS SDK"
     exit 1
 fi
+MACOS_SDK=$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)
+echo "macOS SDK: ${MACOS_SDK}"
 echo "iOS SDK: ${IOS_SDK}"
 echo "LLVM 版本: ${LLVM_VERSION}"
 
@@ -66,6 +68,9 @@ else
           -B "${NATIVE_BUILD}" \
           -G "Ninja" \
           -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_OSX_SYSROOT="${MACOS_SDK}" \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+          -DCMAKE_CXX_STANDARD=17 \
           -DLLVM_TARGETS_TO_BUILD="AArch64" \
           -DLLVM_BUILD_LLVM_DYLIB=OFF \
           -DLLVM_LINK_LLVM_DYLIB=OFF \
