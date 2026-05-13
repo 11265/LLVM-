@@ -263,8 +263,29 @@ size_t LLVMDisasmInst(void *dc, const uint8_t *bytes, size_t size,
     raw_string_ostream OS(formatted);
     ctx->IP->printInst(&Inst, address, "", *ctx->STI, OS);
 
-    size_t copyLen = std::min(formatted.size(), outSize - 1);
-    std::memcpy(out, formatted.data(), copyLen);
+    // printInst 输出格式可能是 "\tmov\tx9, #22732" 或 "mov   x9, #22732"
+    // 标准化为 "mov\tx9, #22732"（tab 分隔 mnemonic 和 operands）
+    const char *s = formatted.c_str();
+    while (*s == ' ' || *s == '\t') s++;                     // 跳过前导空白
+
+    std::string result(s);
+    size_t sep = result.find('\t');
+    if (sep == std::string::npos) sep = result.find(' ');     // 找第一个分隔符
+
+    if (sep != std::string::npos) {
+        size_t opStart = sep + 1;
+        while (opStart < result.size() && (result[opStart] == ' ' || result[opStart] == '\t'))
+            opStart++;
+        // 去掉尾部空白
+        size_t opEnd = result.size();
+        while (opEnd > opStart && (result[opEnd-1] == ' ' || result[opEnd-1] == '\t' || result[opEnd-1] == '\n'))
+            opEnd--;
+        result = result.substr(0, sep) + "\t" + result.substr(opStart, opEnd - opStart);
+    }
+    // else: 无操作数指令 (ret, nop 等)，直接用 mnemonic
+
+    size_t copyLen = std::min(result.size(), outSize - 1);
+    std::memcpy(out, result.data(), copyLen);
     out[copyLen] = '\0';
 
     return copyLen;
