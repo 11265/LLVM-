@@ -81,9 +81,10 @@ cmake -S "${LLVM_DIR}/llvm" \
       \
       `# iOS ARM64 交叉编译 (一等公民)` \
       -DCMAKE_SYSTEM_NAME=iOS \
-      -DCMAKE_OSX_SYSROOT=iphoneos \
+      -DCMAKE_OSX_SYSROOT="${IOS_SDK}" \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+      -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
       \
       `# 使用阶段1的原生 TableGen` \
       -DLLVM_TABLEGEN="${TABLEGEN_BIN}" \
