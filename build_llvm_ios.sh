@@ -97,8 +97,7 @@ cmake -S "${LLVM_DIR}/llvm" \
       -DLLVM_BUILD_STATIC=ON \
       -DLLVM_BUILD_LLVM_DYLIB=OFF \
       -DLLVM_LINK_LLVM_DYLIB=OFF \
-      -DLLVM_ENABLE_SHARED=OFF \
-      \
+      
       `# 最小化功能` \
       -DLLVM_ENABLE_TERMINFO=OFF \
       -DLLVM_ENABLE_ZLIB=OFF \
@@ -133,7 +132,7 @@ cmake -S "${LLVM_DIR}/llvm" \
 echo "[阶段2] CMake 配置完成, 开始编译..."
 
 cmake --build "${IOS_BUILD}" \
-      --target LLVMDisassembler \
+      --target LLVMMCDisassembler \
       LLVMAArch64Disassembler \
       LLVMAArch64Desc \
       LLVMAArch64Info \
